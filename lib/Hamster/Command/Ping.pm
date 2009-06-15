@@ -1,16 +1,17 @@
 package Hamster::Command::Ping;
 
-use Mouse;
-use AnyEvent::XMPP::IM::Message;
+use strict;
+use warnings;
+
+use base 'Hamster::Command::Base';
+
+use Hamster::Answer;
 
 sub run {
     my $self = shift;
-    my ($hamster, $human, $message) = @_;
+    my ($message, $cb) = @_;
 
-    return AnyEvent::XMPP::IM::Message->new(
-        to   => $human->jid,
-        body => 'PONG'
-    );
+    $cb->(Hamster::Answer->new(body => 'PONG'));
 }
 
 1;

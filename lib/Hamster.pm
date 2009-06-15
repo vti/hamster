@@ -1,24 +1,35 @@
 package Hamster;
 
+use strict;
+use warnings;
+
 use Mouse;
-use Encode;
+
+use AnyEvent;
+use AnyEvent::XMPP::Client;
 use AnyEvent::XMPP::IM::Connection;
 use AnyEvent::XMPP::IM::Message;
+use AnyEvent::XMPP::IM::Roster;
 
+use Hamster::Brain;
 use Hamster::Localizator;
 
 use Hamster::Human;
 use Hamster::Dispatcher;
 
 use Hamster::Command::Ping;
-use Hamster::Command::Post;
+use Hamster::Command::Create;
 use Hamster::Command::Stat;
 use Hamster::Command::Lang;
 
-has resource => (
-    is      => 'Str',
+has cv => (
+    is => 'rw'
+);
+
+has connection_args => (
+    isa     => 'HashRef',
     is      => 'rw',
-    default => 'Hamster bot'
+    default => sub { { resource => 'Hamster' } }
 );
 
 has localizator => (
@@ -26,7 +37,7 @@ has localizator => (
     default => sub { Hamster::Localizator->new }
 );
 
-has username => (
+has jid => (
     isa => 'Str',
     is  => 'rw'
 );
@@ -36,7 +47,12 @@ has password => (
     is  => 'rw'
 );
 
-has domain => (
+has host => (
+    isa => 'Str',
+    is  => 'rw'
+);
+
+has port => (
     isa => 'Str',
     is  => 'rw'
 );
@@ -46,170 +62,136 @@ has dispatcher => (
     default => sub {
         Hamster::Dispatcher->new(
             map => [
-                PING => Hamster::Command::Ping->new,
-                STAT => Hamster::Command::Stat->new,
-                LANG => Hamster::Command::Lang->new,
-                _    => Hamster::Command::Post->new
+                qr/^PING$/ => Hamster::Command::Ping->new,
+                qr/^STAT$/ => Hamster::Command::Stat->new,
+                qr/^LANG$/ => Hamster::Command::Lang->new,
+                '*'        => Hamster::Command::Create->new
             ]
         );
     }
 );
 
-has con => (is => 'rw');
-
-has roster => (is => 'rw');
-
-has debug => (
-    isa     => 'Bool',
+has client => (
     is      => 'rw',
-    default => 0
+    default => sub {
+        AnyEvent::XMPP::Client->new(debug => $ENV{HAMSTER_DEBUG} ? 1 : 0);
+    }
+);
+
+has roster => (
+    is      => 'rw',
+    default => sub { AnyEvent::XMPP::IM::Roster->new }
 );
 
 sub BUILD {
     my $self = shift;
+    
+    $self->dispatcher->hamster($self);
 
-    my $con = AnyEvent::XMPP::IM::Connection->new(
-        username => $self->username,
-        password => $self->password,
-        domain   => $self->domain,
-        resource => $self->resource
-    );
+    my $client = $self->client;
 
-    $con->reg_cb(
-        session_ready => sub { shift; $self->_on_online(@_) },
-        roster_update => sub { shift; $self->_on_roster_update(@_) },
-        disconnect    => sub { shift; $self->_on_offline(@_) },
-        message_xml   => sub { shift; $self->_on_message(@_) },
-        contact_request_subscribe =>
-          sub { shift; $self->_on_subscribe_request(@_); },
-        contact_subscribed   => sub { shift; $self->_on_subscribe(@_) },
-        contact_unsubscribed => sub { shift; $self->_on_unsubscribe(@_) }
-    );
+    $client->set_presence(undef, 'Hamster', 1);
 
-    $con->reg_cb(
-        debug_recv => sub {
-            require XML::Twig;
-            my $t = XML::Twig->new();
-            $t->parse($_[1]);
-            print "<--------------\n";
-            $t->set_pretty_print('indented');
-            $t->print;
-            print "\n";
+    $client->add_account($self->jid, $self->password, $self->host,
+        $self->port, $self->connection_args);
+
+    $client->reg_cb(
+        session_ready => sub {
+            my ($client, $acc) = @_;
+
+            warn 'connected!';
         },
-        debug_send => sub {
-            require XML::Twig;
-            my $t = XML::Twig->new();
-            $t->parse($_[1]);
-            print "-------------->\n";
-            $t->set_pretty_print('indented');
-            $t->print;
-            print "\n";
-        },
-    ) if $self->debug;
+        roster_update => sub {
+            my ($client, $acc, $roster, $contacts) = @_;
 
-    $self->con($con);
+            $self->roster($roster);
+
+            $roster->debug_dump;
+        },
+        message => sub {
+            my ($client, $acc, $msg) = @_;
+
+            $self->dispatcher->dispatch(
+                $msg,
+                sub {
+                    my $answer = shift;
+
+                    if ($answer) {
+                        my $reply = $msg->make_reply;
+
+                        $reply->add_body($answer->body);
+
+                        $reply->send;
+                    }
+
+                    return;
+                }
+            );
+        },
+        contact_request_subscribe => sub {
+            my ($cl, $acc, $roster, $contact) = @_;
+
+            $contact->send_subscribed;
+
+            $contact->send_subscribe;
+
+            warn "Subscribed to " . $contact->jid . "\n";
+        },
+        contact_subscribed => sub {
+            my ($cl, $acc, $roster, $contact) = @_;
+
+            $self->roster->add_contact($contact->jid, sub {});
+        },
+        contact_did_unsubscribe => sub {
+            my ($cl, $acc, $roster, $contact) = @_;
+
+            $contact->send_unsubscribe;
+
+            $self->roster->delete_contact($contact->jid, sub {});
+        },
+        contact_unsubscribed => sub {
+            my ($cl, $acc, $roster, $contact) = @_;
+
+            $contact->send_unsubscribed;
+        },
+        error => sub {
+            my ($client, $acc, $error) = @_;
+
+            warn "error: " . $error->string;
+
+            $self->cv->broadcast;
+        },
+        disconnect => sub {
+            warn "Got disconnected";
+
+            $self->cv->broadcast;
+        },
+    );
 }
 
 sub connect {
     my $self = shift;
 
-    my $connected;
-    do {
-        print STDERR "Connecting...\n";
-        $connected = $self->con->connect;
-    } while (!$connected && $self->con->may_try_connect);
+    $self->cv(AnyEvent->condvar);
 
-    die "Could not connect to server: $!, " if !$connected;
+    $self->client->start;
 
-    print STDERR "Connected!\n";
-}
-
-sub start {
-    my $self = shift;
-
-    $self->connect;
-    AnyEvent->condvar->wait;
+    $self->cv->wait;
 }
 
 sub disconnect {
     my $self = shift;
+
+    $self->client->disconnect;
 }
 
-sub _on_roster_update {
+sub log {
     my $self = shift;
-    my ($roster, $contacts) = @_;
+    my $message = shift;
 
-    $self->roster($roster);
-}
-
-sub _on_subscribe_request {
-    my $self = shift;
-    my ($roster, $contact, $message) = @_;
-
-    $contact->send_subscribed;
-
-    $contact->send_subscribe;
-}
-
-sub _on_subscribe {
-    my $self = shift;
-    my ($roster, $contact, $message) = @_;
-
-}
-
-sub _on_unsubscribe {
-    my $self = shift;
-    my ($roster, $contact, $message) = @_;
-
-    $contact->send_unsubscribed;
-
-    $contact->send_unsubscribe;
-
-    $self->roster->delete_contact($contact->jid, sub {});
-}
-
-sub _on_online {
-    my $self = shift;
-
-    my $con = $self->con;
-
-    $con->send_presence(
-        undef, undef,
-        status   => 'Bot',
-        priority => -1,
-    );
-}
-
-sub _on_offline {
-    my $self = shift;
-}
-
-sub _on_message {
-    my $self = shift;
-    my ($node) = @_;
-
-    return unless $node;
-
-    my $from    = $node->attr('from');
-    my @nodes   = grep { $_->name eq 'body' } $node->nodes;
-    my $message = $nodes[0]->text;
-
-    my ($jid, $resource) = split('/', $from);
-
-    my $human = Hamster::Human->new(jid => $jid, resource => $resource);
-
-    #if (time - $user->column('lastaction') < 5) {
-    #my $msg = AnyEvent::XMPP::IM::Message->new(
-    #to   => $from,
-    #body => 'Вы слишком быстры!'
-    #);
-    #$msg->send($self->con);
-    #return;
-    #}
-
-    if (my $msg = $self->dispatcher->dispatch($self, $human, $message)) {
-        $msg->send($self->con);
-    }
+    open FILE, ">> log.txt";
+    print FILE $message;
+    close FILE;
 }
 
 1;

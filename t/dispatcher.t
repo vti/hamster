@@ -1,26 +1,27 @@
 use Test::More tests => 5;
 
-use Hamster::Human;
+use AnyEvent::XMPP::IM::Message;
+use Hamster;
 use Hamster::Dispatcher;
 use Hamster::Command::Ping;
 
-my $human = Hamster::Human->new(jid => 'foo@bar.com');
+my $hamster = Hamster->new;
 
-my $d = Hamster::Dispatcher->new;
+my $d = Hamster::Dispatcher->new(hamster => $hamster);
 ok($d);
 
-$d->add_map(PING => Hamster::Command::Ping->new);
+$d->add_map(qr/^PING$/ => Hamster::Command::Ping->new);
 
-my $msg = $d->dispatch;
-ok(not defined $msg);
+$d->dispatch(undef, sub { ok(not defined shift) });
 
-$msg = $d->dispatch(undef, $human, 'FOO');
-ok(not defined $msg);
+$d->dispatch(_msg('FOO'), sub { ok(not defined shift); });
 
-$msg = $d->dispatch(undef, $human, 'PING');
-is($msg->body, 'PONG');
+$d->dispatch(_msg('PING'), sub { is(shift->body, 'PONG'); });
 
-$d->add_map(_ => Hamster::Command::Ping->new);
+$d->add_map('*' => Hamster::Command::Ping->new);
 
-$msg = $d->dispatch(undef, $human, 'FOO');
-is($msg->body, 'PONG');
+$d->dispatch(_msg('FOO'), sub { is(shift->body, 'PONG'); });
+
+sub _msg {
+    AnyEvent::XMPP::IM::Message->new(body => shift);
+}

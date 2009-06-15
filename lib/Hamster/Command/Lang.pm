@@ -1,16 +1,14 @@
 package Hamster::Command::Lang;
 
-use Mouse;
-use AnyEvent::XMPP::IM::Message;
+use base 'Hamster::Command::Base';
+
+use Hamster::Answer;
 
 sub run {
     my $self = shift;
-    my ($hamster, $human, $message) = @_;
+    my ($message, $cb) = @_;
 
-    return AnyEvent::XMPP::IM::Message->new(
-        to   => $human->jid,
-        body => $hamster->localizator->language
-    );
+    $cb->(Hamster::Answer->new(body => $self->hamster->localizator->language));
 }
 
 1;

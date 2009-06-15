@@ -1,28 +1,21 @@
 package Hamster::Command::Stat;
 
-use Mouse;
-use AnyEvent::XMPP::IM::Message;
+use base 'Hamster::Command::Base';
+
+use Hamster::Answer;
 
 sub run {
     my $self = shift;
-    my ($hamster, $human, $message) = @_;
+    my ($message, $cb) = @_;
 
-    my $contacts = $hamster->roster->get_contacts;
+    my $contacts = $self->hamster->roster->get_contacts;
 
     my $users = @$contacts;
-    my $online = grep {
-        $_->subscription ne 'none'
-          && ($_->get_presence && !$_->get_presence->show)
-    } @$contacts;
 
     my $stat = <<"";
 Users : $users
-Online: $online
 
-    return AnyEvent::XMPP::IM::Message->new(
-        to   => $human->jid,
-        body => $stat
-    );
+    return $cb->(Hamster::Answer->new(body => $stat));
 }
 
 1;
