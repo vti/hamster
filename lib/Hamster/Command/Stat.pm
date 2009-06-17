@@ -1,21 +1,27 @@
 package Hamster::Command::Stat;
 
-use base 'Hamster::Command::Base';
+use Mouse;
 
-use Hamster::Answer;
+extends 'Hamster::Command::Base';
 
 sub run {
     my $self = shift;
-    my ($message, $cb) = @_;
+    my ($human, $msg, $cb) = @_;
 
-    my $contacts = $self->hamster->roster->get_contacts;
+    my @contacts = $self->hamster->roster->get_contacts;
 
-    my $users = @$contacts;
+    my $users = @contacts;
 
     my $stat = <<"";
 Users : $users
 
-    return $cb->(Hamster::Answer->new(body => $stat));
+    my $reply = $msg->make_reply;
+
+    $reply->add_body($stat);
+
+    $reply->send;
+
+    return $cb->();
 }
 
 1;

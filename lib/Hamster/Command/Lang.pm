@@ -2,13 +2,17 @@ package Hamster::Command::Lang;
 
 use base 'Hamster::Command::Base';
 
-use Hamster::Answer;
-
 sub run {
     my $self = shift;
-    my ($message, $cb) = @_;
+    my ($human, $msg, $cb) = @_;
 
-    $cb->(Hamster::Answer->new(body => $self->hamster->localizator->language));
+    my $reply = $msg->make_reply;
+
+    $reply->add_body($self->hamster->localizator->language);
+
+    $reply->send;
+
+    return $cb->();
 }
 
 1;

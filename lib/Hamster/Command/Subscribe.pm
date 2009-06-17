@@ -1,4 +1,4 @@
-package Hamster::Command::Ping;
+package Hamster::Command::Subscribe;
 
 use Mouse;
 
@@ -8,11 +8,8 @@ sub run {
     my $self = shift;
     my ($human, $msg, $cb) = @_;
 
-    my $reply = $msg->make_reply;
-
-    $reply->add_body('PONG');
-
-    $reply->send;
+    my $body = $msg->any_body;
+    $body =~ s/^S //;
 
     return $cb->();
 }

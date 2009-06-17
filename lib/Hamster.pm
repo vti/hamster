@@ -6,23 +6,30 @@ use warnings;
 use Mouse;
 
 use AnyEvent;
+use AnyEvent::DBI;
 use AnyEvent::XMPP::Client;
 use AnyEvent::XMPP::IM::Connection;
 use AnyEvent::XMPP::IM::Message;
 use AnyEvent::XMPP::IM::Roster;
 
-use Hamster::Brain;
 use Hamster::Localizator;
 
 use Hamster::Human;
 use Hamster::Dispatcher;
 
 use Hamster::Command::Ping;
-use Hamster::Command::Create;
+use Hamster::Command::CreateReply;
+use Hamster::Command::CreateTopic;
+use Hamster::Command::ViewTopic;
+use Hamster::Command::Subscribe;
 use Hamster::Command::Stat;
 use Hamster::Command::Lang;
 
 has cv => (
+    is => 'rw'
+);
+
+has dbh => (
     is => 'rw'
 );
 
@@ -62,10 +69,13 @@ has dispatcher => (
     default => sub {
         Hamster::Dispatcher->new(
             map => [
-                qr/^PING$/ => Hamster::Command::Ping->new,
-                qr/^STAT$/ => Hamster::Command::Stat->new,
-                qr/^LANG$/ => Hamster::Command::Lang->new,
-                '*'        => Hamster::Command::Create->new
+                qr/^PING$/             => Hamster::Command::Ping->new,
+                qr/^STAT$/             => Hamster::Command::Stat->new,
+                qr/^LANG$/             => Hamster::Command::Lang->new,
+                qr/^#\d+$/           => Hamster::Command::ViewTopic->new,
+                qr/^#\d+.+$/             => Hamster::Command::CreateReply->new,
+                #qr/^S (?:#|\*|\@)\d+$/ => Hamster::Command::Subscribe->new,
+                '*'                    => Hamster::Command::CreateTopic->new
             ]
         );
     }
@@ -85,6 +95,9 @@ has roster => (
 
 sub BUILD {
     my $self = shift;
+
+    $self->dbh(AnyEvent::DBI->new("DBI:SQLite:dbname=test.db", "", ""));
+    $self->dbh->attr('RaiseError', [0], sub { my ($dbh) = @_; $self->dbh($dbh)});
     
     $self->dispatcher->hamster($self);
 
@@ -111,20 +124,56 @@ sub BUILD {
         message => sub {
             my ($client, $acc, $msg) = @_;
 
-            $self->dispatcher->dispatch(
-                $msg,
+            my ($jid, $resource) = split('/', $msg->from);
+
+            $self->dbh->exec(
+                qq/SELECT * FROM `human` JOIN `jid` ON `human`.`id` = `human_id` WHERE `jid`=?/,
+                $jid,
                 sub {
-                    my $answer = shift;
+                    my ($dbh, $rows, $rv) = @_;
 
-                    if ($answer) {
-                        my $reply = $msg->make_reply;
+                    if (@$rows) {
+                        warn 'FOUND USER: ' . $rows->[0]->[0];
 
-                        $reply->add_body($answer->body);
+                        my $human = Hamster::Human->new(
+                            id       => $rows->[0]->[0],
+                            resource => $resource
+                        );
 
-                        $reply->send;
+                        return $self->dispatch($human, $msg, sub {});
                     }
 
-                    return;
+                    warn 'USER NOT FOUND';
+
+                    $self->dbh->exec(
+                        'INSERT INTO `human` (`addtime`) VALUES (?)',
+                        time,
+                        sub {
+                            my ($rs, $rows, $rv) = @_;
+
+                            $dbh->func(
+                                q/undef, undef, 'human', 'id'/,
+                                'last_insert_id',
+                                sub {
+                                    my ($dbh, $result, $handle_error) = @_;
+
+                                    $self->dbh->exec(
+                                        'INSERT INTO `jid` (`human_id`,`jid`) VALUES (?, ?)',
+                                        ($result, $jid) => sub {
+
+                                            my $human = Hamster::Human->new(
+                                                id       => $result,
+                                                resource => $resource
+                                            );
+
+                                            return $self->dispatch($human,
+                                                $msg, sub { });
+                                        }
+                                    );
+                                }
+                            );
+                        }
+                    );
                 }
             );
         },
@@ -177,6 +226,13 @@ sub connect {
     $self->client->start;
 
     $self->cv->wait;
+}
+
+sub dispatch {
+    my $self = shift;
+    my ($human, $msg, $cb) = @_;
+
+    $self->dispatcher->dispatch($human, $msg, sub { return $cb->(); });
 }
 
 sub disconnect {

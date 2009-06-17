@@ -1,8 +1,5 @@
 package Hamster::Dispatcher;
 
-use strict;
-use warnings;
-
 use Mouse;
 
 has map => (
@@ -24,12 +21,17 @@ sub add_map {
 
 sub dispatch {
     my $self = shift;
-    my ($message, $cb) = @_;
+    my ($human, $msg, $cb) = @_;
 
-    return $cb->() unless $message;
+    return $cb->() unless $msg;
 
     my $command;
     my $default;
+
+    my $body = $msg->any_body;
+
+    $body =~ s/^\s+//;
+    $body =~ s/\s+$//;
 
     for (my $i = 0; $i < @{$self->map}; $i += 2) {
         my $key     = $self->map->[$i];
@@ -40,7 +42,7 @@ sub dispatch {
             next;
         }
 
-        if ($message =~ m/$key/) {
+        if ($body =~ m/$key/) {
             $command = $handler;
             last;
         }
@@ -50,7 +52,7 @@ sub dispatch {
 
     if ($command) {
         $command->hamster($self->hamster) unless $command->hamster;
-        return $command->run($message, sub { return $cb->(shift) });
+        return $command->run($human, $msg, sub { return $cb->(shift) });
     }
 
     return $cb->();
