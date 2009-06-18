@@ -1,4 +1,4 @@
-package Hamster::Command::Ping;
+package Hamster::Command::Nick;
 
 use Mouse;
 

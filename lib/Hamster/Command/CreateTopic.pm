@@ -8,9 +8,9 @@ use Async::Hooks;
 
 sub run {
     my $self = shift;
-    my ($human, $msg, $cb) = @_;
+    my ($cb) = @_;
 
-    my $body = $msg->any_body;
+    my ($body) = @{$self->args};
 
     my ($text, $tags) = $self->_parse($body);
 
@@ -18,7 +18,7 @@ sub run {
 
     $dbh->exec(
         qq/INSERT INTO `topic` (jid_id, addtime, body, resource) VALUES (?, ?, ?, ?)/ =>
-          ($human->id, time, $text, $human->resource) => sub {
+          ($self->human->id, time, $text, $self->human->resource) => sub {
             my ($dbh, $rows, $rv) = @_;
 
             $dbh->func(
@@ -35,11 +35,11 @@ sub run {
 
                     $hooks->call(
                         'insert_tag',
-                        [$dbh, $result, $tags],
+                        [$self, $dbh, $result, $tags],
                         sub {
                             my ($ctl, $args, $is_done) = @_;
 
-                            my $reply = $msg->make_reply;
+                            my $reply = $self->msg->make_reply;
 
                             $reply->add_body(
                                 "Topic '$text' was created #$result");
@@ -57,7 +57,7 @@ sub run {
 
 sub _insert_tag_hook {
     my ($ctl, $args) = @_;
-    my ($dbh, $topic_id, $tags) = @$args;
+    my ($self, $dbh, $topic_id, $tags) = @$args;
 
     my $title = shift @$tags;
 
@@ -67,7 +67,7 @@ sub _insert_tag_hook {
             my ($dbh, $rows, $rv) = @_;
 
             if (@$rows) {
-                return _insert_tag_map($dbh, $rows->[0]->[0],
+                return _insert_tag_map($self, $dbh, $rows->[0]->[0],
                     $topic_id, sub { $ctl->next; });
             }
             else {
@@ -82,7 +82,7 @@ sub _insert_tag_hook {
                             sub {
                                 my ($dbh, $result, $handle_error) = @_;
 
-                                _insert_tag_map($dbh, $result, $topic_id,
+                                _insert_tag_map($self, $dbh, $result, $topic_id,
                                     sub { $ctl->next; });
                             }
                         );
@@ -94,7 +94,7 @@ sub _insert_tag_hook {
 }
 
 sub _insert_tag_map {
-    my ($dbh, $tag_id, $topic_id, $cb) = @_;
+    my ($self, $dbh, $tag_id, $topic_id, $cb) = @_;
 
     $dbh->exec(
         qq/INSERT INTO `tag_map` (tag_id, topic_id) VALUES (?,?)/ =>

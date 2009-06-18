@@ -6,11 +6,11 @@ extends 'Hamster::Command::Base';
 
 sub run {
     my $self = shift;
-    my ($human, $msg, $cb) = @_;
+    my ($cb) = @_;
 
     my $dbh = $self->hamster->dbh;
 
-    my ($id, $show_replies) = ($msg->any_body =~ m/^#(\d+)(\+)?$/);
+    my ($id, $show_replies) = @{$self->args};
 
     $dbh->exec(
         qq/SELECT body,replies,jid.jid,human.nick FROM `topic`
@@ -23,7 +23,7 @@ sub run {
             use Data::Dumper;
             warn Dumper $rows;
 
-            my $reply = $msg->make_reply;
+            my $reply = $self->msg->make_reply;
 
             if (@$rows) {
                 my $topic = $rows->[0];

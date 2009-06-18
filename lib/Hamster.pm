@@ -18,6 +18,7 @@ use Hamster::Human;
 use Hamster::Dispatcher;
 
 use Hamster::Command::Ping;
+use Hamster::Command::Nick;
 use Hamster::Command::CreateReply;
 use Hamster::Command::CreateTopic;
 use Hamster::Command::ViewTopic;
@@ -69,13 +70,15 @@ has dispatcher => (
     default => sub {
         Hamster::Dispatcher->new(
             map => [
-                qr/^PING$/             => Hamster::Command::Ping->new,
-                qr/^STAT$/             => Hamster::Command::Stat->new,
-                qr/^LANG$/             => Hamster::Command::Lang->new,
-                qr/^#\d+\+?$/          => Hamster::Command::ViewTopic->new,
-                qr/^#\d+.+(?:\/\d+)?$/      => Hamster::Command::CreateReply->new,
-                #qr/^S (?:#|\*|\@)\d+$/ => Hamster::Command::Subscribe->new,
-                '*'                    => Hamster::Command::CreateTopic->new
+                qr/^PING$/ => Hamster::Command::Ping->new,
+                qr/^STAT$/ => Hamster::Command::Stat->new,
+                qr/^LANG$/ => Hamster::Command::Lang->new,
+                qr/^NICK ([a-zA-Z][a-zA-Z0-9-]{1,15})$/ =>
+                  Hamster::Command::Nick->new,
+                qr/^#(\d+)(\+)?$/ => Hamster::Command::ViewTopic->new,
+                qr/^#(\d+)(?:\/(\d+))?\s+(.+)/ =>
+                  Hamster::Command::CreateReply->new,
+                '*' => Hamster::Command::CreateTopic->new
             ]
         );
     }

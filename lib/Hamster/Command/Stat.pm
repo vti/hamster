@@ -6,7 +6,7 @@ extends 'Hamster::Command::Base';
 
 sub run {
     my $self = shift;
-    my ($human, $msg, $cb) = @_;
+    my ($cb) = @_;
 
     my @contacts = $self->hamster->roster->get_contacts;
 
@@ -15,7 +15,7 @@ sub run {
     my $stat = <<"";
 Users : $users
 
-    my $reply = $msg->make_reply;
+    my $reply = $self->msg->make_reply;
 
     $reply->add_body($stat);
 

@@ -33,16 +33,22 @@ sub dispatch {
     $body =~ s/^\s+//;
     $body =~ s/\s+$//;
 
+    my @args;
     for (my $i = 0; $i < @{$self->map}; $i += 2) {
         my $key     = $self->map->[$i];
         my $handler = $self->map->[$i + 1];
 
         if ($key eq '*') {
+            push @args, $body;
             $default = $handler;
             next;
         }
 
-        if ($body =~ m/$key/) {
+        if ($body =~ s/$key//) {
+            for ($1, $2, $3, $4, $5) {
+                push @args, $_;
+            }
+
             $command = $handler;
             last;
         }
@@ -52,7 +58,10 @@ sub dispatch {
 
     if ($command) {
         $command->hamster($self->hamster) unless $command->hamster;
-        return $command->run($human, $msg, sub { return $cb->(shift) });
+        $command->human($human);
+        $command->msg($msg);
+        $command->args([@args]) if @args;
+        return $command->run(sub { return $cb->(shift) });
     }
 
     return $cb->();
