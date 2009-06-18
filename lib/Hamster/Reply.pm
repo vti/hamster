@@ -19,7 +19,7 @@ has body => (
 
 has author => (
     isa => 'Str',
-    is  => 'tw'
+    is  => 'rw'
 );
 
 has parent_body => (
@@ -30,6 +30,12 @@ has parent_body => (
 has parent_author => (
     isa => 'Str',
     is  => 'rw'
+);
+
+has parent_body_max_length => (
+    isa     => 'Int',
+    is      => 'rw',
+    default => 77
 );
 
 sub _create {
@@ -199,14 +205,18 @@ sub find_all {
 
             foreach my $row (@$rows) {
                 my $reply = Hamster::Reply->new(
-                    author => $row->[4] || $row->[3],
-                    body => $row->[2]
+                    topic_id => $row->[0],
+                    seq      => $row->[1],
+                    author   => $row->[4] || $row->[3],
+                    body     => $row->[2]
                 );
 
                 if (my $parent_author = $row->[7] || $row->[6]) {
                     my $parent_body = '';
-                    if (length($row->[5]) > 77) {
-                        $parent_body .= substr($row->[5], 0, 77);
+
+                    if (length($row->[5]) > $reply->parent_body_max_length) {
+                        $parent_body .= substr($row->[5], 0,
+                            $reply->parent_body_max_length);
                         $parent_body .= '...';
                     }
                     else {

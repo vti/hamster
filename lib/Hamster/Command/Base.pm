@@ -22,6 +22,13 @@ has msg => (
     is  => 'rw'
 );
 
+sub render {
+    my $self = shift;
+    my $template = shift;
+
+    return $self->hamster->view->$template($self->human->lang, @_);
+}
+
 sub send {
     my $self = shift;
     my ($body, $cb) = @_;

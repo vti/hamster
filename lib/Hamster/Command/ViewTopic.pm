@@ -22,10 +22,7 @@ sub run {
             my ($dbh, $topic) = @_;
 
             if ($topic) {
-                my $replies = $topic->replies;
-                my $nick    = $topic->author;
-
-                my $msg = $topic->body;
+                my $msg = $self->render(topic => $topic);
 
                 if ($show_replies) {
                     Hamster::Reply->find_all(
@@ -35,6 +32,8 @@ sub run {
                             my ($dbh, $replies) = @_;
 
                             foreach my $reply (@$replies) {
+                                $msg .= "\n";
+                                $msg .= $self->render(reply => $reply);
                             }
 
                             return $self->send($msg, sub { $cb->() });

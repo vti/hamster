@@ -164,6 +164,19 @@ sub update_lang {
     );
 }
 
+sub count_all {
+    my $class = shift;
+    my ($dbh, $arg, $cb) = @_;
+
+    $dbh->exec(
+        qq/SELECT COUNT(*) FROM human/ => sub {
+            my ($dbh, $rows, $rv) = @_;
+
+            return $cb->($dbh, $rows->[0]->[0]);
+        }
+    );
+}
+
 sub add_jid {
     my $self = shift;
 

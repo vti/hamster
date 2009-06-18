@@ -16,6 +16,7 @@ use Hamster::Localizator;
 
 use Hamster::Human;
 use Hamster::Dispatcher;
+use Hamster::View;
 
 use Hamster::Command::Help;
 use Hamster::Command::List;
@@ -91,6 +92,11 @@ has dispatcher => (
     }
 );
 
+has view => (
+    is      => 'rw',
+    default => sub { Hamster::View->new }
+);
+
 has client => (
     is      => 'rw',
     default => sub {
@@ -110,6 +116,8 @@ sub BUILD {
     $self->dbh->attr('unicode', [1], sub {});
     
     $self->dispatcher->hamster($self);
+
+    $self->view->hamster($self);
 
     my $client = $self->client;
 
@@ -169,7 +177,15 @@ sub BUILD {
         contact_subscribed => sub {
             my ($cl, $acc, $roster, $contact) = @_;
 
-            $self->roster->add_contact($contact->jid, sub {});
+            $self->roster->new_contact(
+                $contact->jid,
+                undef,
+                [],
+                sub {
+                    my ($contact, $error) = @_;
+
+                }
+            );
         },
         contact_did_unsubscribe => sub {
             my ($cl, $acc, $roster, $contact) = @_;
@@ -228,6 +244,12 @@ sub log {
     open FILE, ">> log.txt";
     print FILE $message;
     close FILE;
+}
+
+sub loc {
+    my $self = shift;
+
+    return $self->localizator->loc(@_);
 }
 
 1;
