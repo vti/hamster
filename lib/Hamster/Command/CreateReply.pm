@@ -24,7 +24,7 @@ sub run {
             my ($dbh, $topic) = @_;
 
             if ($topic) {
-                Hamster::Reply->reply(
+                Hamster::Reply->create(
                     $dbh,
                     {   topic      => $topic,
                         parent_seq => $parent_seq,

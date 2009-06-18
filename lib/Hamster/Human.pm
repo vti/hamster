@@ -20,6 +20,11 @@ has jids => (
     default => sub { [] }
 );
 
+has jid => (
+    isa => 'Str',
+    is  => 'rw'
+);
+
 has resource => (
     isa => 'Str',
     is  => 'rw'
@@ -36,7 +41,7 @@ sub find {
     my ($dbh, $args, $cb) = @_;
 
     $dbh->exec(
-        qq/SELECT human.id,human.nick,human.lang
+        qq/SELECT human.id, human.nick, human.lang
             FROM `human`
             JOIN `jid` ON `human`.`id` = `human_id` WHERE `jid`=?/,
         $args->{jid},
@@ -47,8 +52,9 @@ sub find {
                 my $row = $rows->[0];
 
                 my $human = Hamster::Human->new(
-                    id   => $row->[0],
-                    lang => $row->[2],
+                    id       => $row->[0],
+                    lang     => $row->[2],
+                    jid      => $args->{jid},
                     resource => $args->{resource}
                 );
 
@@ -156,18 +162,6 @@ sub update_lang {
             return $cb->();
         }
     );
-}
-
-sub jid {
-    my $self = shift;
-
-    if (@_) {
-        my $from = $_[0];
-        my ($jid) = split('/', $from);
-
-        my @jids = grep { $_->jid eq $jid } @{$self->jids};
-        return $jids[0];
-    }
 }
 
 sub add_jid {

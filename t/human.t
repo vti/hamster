@@ -19,7 +19,7 @@ is(@{$human->jids}, 1);
 
 is($human->jids->[0]->jid, qw/foo@bar.com/);
 
-is($human->jid('foo@bar.com/Hello')->id, 1);
+is($human->jid('foo@bar.com'), 'foo@bar.com');
 
 my $cv = AnyEvent->condvar;
 

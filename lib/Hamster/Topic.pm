@@ -25,7 +25,7 @@ has replies => (
 
 has author => (
     isa => 'Str',
-    is  => 'tw'
+    is  => 'rw'
 );
 
 use Async::Hooks;
@@ -133,23 +133,18 @@ sub find_all {
 
             my $topics = [];
 
-            if (@$rows) {
-                foreach my $row (@$rows) {
-                    my $topic = Hamster::Topic->new(
-                        id      => $row->[0],
-                        body    => $row->[1],
-                        replies => $row->[2],
-                        author  => $row->[4] || $row->[3]
-                    );
+            foreach my $row (@$rows) {
+                my $topic = Hamster::Topic->new(
+                    id      => $row->[0],
+                    body    => $row->[1],
+                    replies => $row->[2],
+                    author  => $row->[4] || $row->[3]
+                );
 
-                    push @$topics, $topic;
-                }
+                push @$topics, $topic;
+            }
 
-                return $cb->($dbh, $topics);
-            }
-            else {
-                return $cb->($dbh);
-            }
+            return $cb->($dbh, $topics);
         }
     );
 }

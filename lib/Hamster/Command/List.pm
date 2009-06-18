@@ -33,7 +33,7 @@ sub run {
                 return $self->send($body, sub { $cb->() });
             }
             else {
-                return $self->send('No topics yest', sub { $cb->() });
+                return $self->send('No topics yet', sub { $cb->() });
             }
         }
     );
