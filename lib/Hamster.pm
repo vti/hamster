@@ -18,6 +18,7 @@ use Hamster::Human;
 use Hamster::Dispatcher;
 
 use Hamster::Command::Help;
+use Hamster::Command::List;
 use Hamster::Command::Ping;
 use Hamster::Command::Nick;
 use Hamster::Command::CreateReply;
@@ -73,6 +74,7 @@ has dispatcher => (
             map => [
                 qr/^HELP$/ => Hamster::Command::Help->new,
                 qr/^PING$/ => Hamster::Command::Ping->new,
+                qr/^(#)$/ => Hamster::Command::List->new,
                 qr/^STAT$/ => Hamster::Command::Stat->new,
                 qr/^LANG$/ => Hamster::Command::Lang->new,
                 qr/^NICK(?: ([a-zA-Z][a-zA-Z0-9-]{1,15}))?$/ =>
