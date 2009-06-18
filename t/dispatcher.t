@@ -12,15 +12,15 @@ ok($d);
 
 $d->add_map(qr/^PING$/ => Hamster::Command::Ping->new);
 
-$d->dispatch(undef, sub { ok(not defined shift) });
+$d->dispatch(undef, undef, sub { ok(not defined shift) });
 
-$d->dispatch(_msg('FOO'), sub { ok(not defined shift); });
+$d->dispatch(undef, _msg('FOO'), sub { ok(not defined shift); });
 
-$d->dispatch(_msg('PING'), sub { is(shift->body, 'PONG'); });
+$d->dispatch(undef, _msg('PING'), sub { is(shift->body, 'PONG'); });
 
 $d->add_map('*' => Hamster::Command::Ping->new);
 
-$d->dispatch(_msg('FOO'), sub { is(shift->body, 'PONG'); });
+$d->dispatch(undef, _msg('FOO'), sub { is(shift->body, 'PONG'); });
 
 sub _msg {
     AnyEvent::XMPP::IM::Message->new(body => shift);

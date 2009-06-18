@@ -1,23 +1,17 @@
 use strict;
 use warnings;
 
-use Test::More tests => 7;
+use Test::More tests => 5;
 
 use_ok('Hamster::Human');
 
 my $human = Hamster::Human->new;
+ok($human);
 
-is("$human", "");
+$human->add_jid(1, 'foo@bar.com');
 
-$human->jid('foo@bar.com');
-is("$human", 'foo@bar.com');
+is(@{$human->jids}, 1);
 
-$human->resource('BitlBee');
-is("$human", 'foo@bar.com/BitlBee');
+is($human->jids->[0]->jid, qw/foo@bar.com/);
 
-$human->parse('foo@bar.com');
-is($human->jid, 'foo@bar.com');
-
-$human->parse('foo@bar.com/BitlBee');
-is($human->jid,      'foo@bar.com');
-is($human->resource, 'BitlBee');
+is($human->jid('foo@bar.com/Hello')->id, 1);

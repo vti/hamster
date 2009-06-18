@@ -72,7 +72,7 @@ has dispatcher => (
                 qr/^PING$/             => Hamster::Command::Ping->new,
                 qr/^STAT$/             => Hamster::Command::Stat->new,
                 qr/^LANG$/             => Hamster::Command::Lang->new,
-                qr/^#\d+$/           => Hamster::Command::ViewTopic->new,
+                qr/^#\d+\+?$/          => Hamster::Command::ViewTopic->new,
                 qr/^#\d+.+$/             => Hamster::Command::CreateReply->new,
                 #qr/^S (?:#|\*|\@)\d+$/ => Hamster::Command::Subscribe->new,
                 '*'                    => Hamster::Command::CreateTopic->new
@@ -140,7 +140,22 @@ sub BUILD {
                             resource => $resource
                         );
 
-                        return $self->dispatch($human, $msg, sub {});
+                        return $self->dbh->exec(
+                            qq/SELECT * FROM `jid` WHERE `human_id`=?/,
+                            $human->id,
+                            sub {
+                                my ($dbh, $rows, $rv) = @_;
+
+                                foreach my $jid (@$rows) {
+                                    $human->add_jid($jid->[0], $jid->[2]);
+                                }
+
+                                use Data::Dumper;
+                                warn Dumper $human;
+
+                                return $self->dispatch($human, $msg, sub { });
+                            }
+                        );
                     }
 
                     warn 'USER NOT FOUND';
@@ -161,13 +176,26 @@ sub BUILD {
                                         'INSERT INTO `jid` (`human_id`,`jid`) VALUES (?, ?)',
                                         ($result, $jid) => sub {
 
-                                            my $human = Hamster::Human->new(
-                                                id       => $result,
-                                                resource => $resource
-                                            );
+                                            $dbh->func(
+                                                q/undef, undef, 'jid', 'id'/,
+                                                'last_insert_id',
+                                                sub {
+                                                    my ($dbh, $result, $handle_error) = @_;
 
-                                            return $self->dispatch($human,
-                                                $msg, sub { });
+                                                    my $human = Hamster::Human->new(
+                                                        id       => $result,
+                                                        resource => $resource
+                                                    );
+
+                                                    $human->add_jid($result, $jid);
+
+                                                    use Data::Dumper;
+                                                    warn Dumper $human;
+
+                                                    return $self->dispatch($human,
+                                                        $msg, sub { });
+                                                }
+                                            );
                                         }
                                     );
                                 }

@@ -17,7 +17,7 @@ sub run {
     my $dbh = $self->hamster->dbh;
 
     $dbh->exec(
-        qq/INSERT INTO `topic` (human_id, addtime, body, resource) VALUES (?, ?, ?, ?)/ =>
+        qq/INSERT INTO `topic` (jid_id, addtime, body, resource) VALUES (?, ?, ?, ?)/ =>
           ($human->id, time, $text, $human->resource) => sub {
             my ($dbh, $rows, $rv) = @_;
 
