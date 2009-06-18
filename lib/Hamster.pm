@@ -104,7 +104,7 @@ sub BUILD {
     my $self = shift;
 
     $self->dbh(AnyEvent::DBI->new("DBI:SQLite:dbname=test.db", "", ""));
-    $self->dbh->attr('RaiseError', [0], sub { my ($dbh) = @_; $self->dbh($dbh)});
+    $self->dbh->attr('unicode', [1], sub {});
     
     $self->dispatcher->hamster($self);
 
