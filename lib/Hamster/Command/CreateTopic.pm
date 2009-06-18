@@ -4,7 +4,7 @@ use Mouse;
 
 extends 'Hamster::Command::Base';
 
-use Async::Hooks;
+use Hamster::Topic;
 
 sub run {
     my $self = shift;
@@ -16,92 +16,18 @@ sub run {
 
     my $dbh = $self->hamster->dbh;
 
-    $dbh->exec(
-        qq/INSERT INTO `topic` (jid_id, addtime, body, resource) VALUES (?, ?, ?, ?)/ =>
-          ($self->human->id, time, $text, $self->human->resource) => sub {
-            my ($dbh, $rows, $rv) = @_;
+    Hamster::Topic->create(
+        $dbh,
+        {   human_id => $self->human->id,
+            body     => $text,
+            tags     => $tags,
+            jid      => $self->human->jid,
+            resource => $self->human->resource
+        },
+        sub {
+            my ($dbh, $topic) = @_;
 
-            $dbh->func(
-                q/undef, undef, 'topic', 'id'/,
-                'last_insert_id',
-                sub {
-                    my ($dbh, $result, $handle_error) = @_;
-
-                    my $hooks = Async::Hooks->new;
-
-                    foreach my $tag (@$tags) {
-                        $hooks->hook('insert_tag', \&_insert_tag_hook);
-                    }
-
-                    $hooks->call(
-                        'insert_tag',
-                        [$self, $dbh, $result, $tags],
-                        sub {
-                            my ($ctl, $args, $is_done) = @_;
-
-                            my $reply = $self->msg->make_reply;
-
-                            $reply->add_body(
-                                "Topic '$text' was created #$result");
-
-                            $reply->send;
-
-                            return $cb->();
-                        }
-                    );
-                }
-            );
-        }
-    );
-}
-
-sub _insert_tag_hook {
-    my ($ctl, $args) = @_;
-    my ($self, $dbh, $topic_id, $tags) = @$args;
-
-    my $title = shift @$tags;
-
-    $dbh->exec(
-        qq/SELECT * FROM `tag` WHERE `title` = ?/,
-        ($title) => sub {
-            my ($dbh, $rows, $rv) = @_;
-
-            if (@$rows) {
-                return _insert_tag_map($self, $dbh, $rows->[0]->[0],
-                    $topic_id, sub { $ctl->next; });
-            }
-            else {
-                $dbh->exec(
-                    qq/INSERT INTO `tag` (title) VALUES (?)/ => ($title) =>
-                      sub {
-                        my ($dbh, $rows, $rv) = @_;
-
-                        $dbh->func(
-                            q/undef, undef, 'topic', 'id'/,
-                            'last_insert_id',
-                            sub {
-                                my ($dbh, $result, $handle_error) = @_;
-
-                                _insert_tag_map($self, $dbh, $result, $topic_id,
-                                    sub { $ctl->next; });
-                            }
-                        );
-                    }
-                );
-            }
-        }
-    );
-}
-
-sub _insert_tag_map {
-    my ($self, $dbh, $tag_id, $topic_id, $cb) = @_;
-
-    $dbh->exec(
-        qq/INSERT INTO `tag_map` (tag_id, topic_id) VALUES (?,?)/ =>
-          ($tag_id, $topic_id) => sub {
-            my ($dbh, $rows, $rv) = @_;
-
-            return $cb->();
+            $self->send('Topic was created', sub { $cb->() });
         }
     );
 }

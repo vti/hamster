@@ -7,4 +7,4 @@ use_ok('Hamster::Localizator');
 
 my $i18n = Hamster::Localizator->new();
 
-is($i18n->loc('foo'), 'foo');
+is($i18n->loc('en', 'foo'), 'foo');

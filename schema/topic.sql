@@ -1,8 +1,9 @@
 DROP TABLE IF EXISTS `topic`;
 CREATE TABLE `topic` (
  `id`       INTEGER PRIMARY KEY,
- `jid_id`   INTEGER NOT NULL,
+ `human_id` INTEGER NOT NULL,
  `addtime`  INTEGER NOT NULL,
+ `jid`      VARCHAR(1023) NOT NULL,
  `resource` VARCHAR(1023) NOT NULL,
  `body`     VARCHAR(1024) NOT NULL,
  `replies`  INTEGER NOT NULL DEFAULT 0

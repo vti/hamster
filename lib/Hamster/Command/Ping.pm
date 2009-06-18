@@ -8,13 +8,7 @@ sub run {
     my $self = shift;
     my ($cb) = @_;
 
-    my $reply = $self->msg->make_reply;
-
-    $reply->add_body('PONG');
-
-    $reply->send;
-
-    return $cb->();
+    return $self->send('PONG', sub { $cb->() });
 }
 
 1;

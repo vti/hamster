@@ -19,8 +19,20 @@ has human => (
 );
 
 has msg => (
-    isa => 'AnyEvent::XMPP::IM::Message',
     is  => 'rw'
 );
+
+sub send {
+    my $self = shift;
+    my ($body, $cb) = @_;
+
+    my $reply = $self->msg->make_reply;
+
+    $reply->add_body($body);
+
+    $reply->send;
+
+    $cb->();
+}
 
 1;

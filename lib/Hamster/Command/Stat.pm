@@ -15,13 +15,7 @@ sub run {
     my $stat = <<"";
 Users : $users
 
-    my $reply = $self->msg->make_reply;
-
-    $reply->add_body($stat);
-
-    $reply->send;
-
-    return $cb->();
+    return $self->send($stat, sub { $cb->() });
 }
 
 1;

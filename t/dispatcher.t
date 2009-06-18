@@ -1,27 +1,38 @@
+use strict;
+use warnings;
+
 use Test::More tests => 5;
 
-use AnyEvent::XMPP::IM::Message;
+use lib 't/lib';
+
+use MessageMock;
 use Hamster;
+use Hamster::Human;
 use Hamster::Dispatcher;
 use Hamster::Command::Ping;
 
 my $hamster = Hamster->new;
+my $human   = Hamster::Human->new;
 
 my $d = Hamster::Dispatcher->new(hamster => $hamster);
 ok($d);
 
 $d->add_map(qr/^PING$/ => Hamster::Command::Ping->new);
 
-$d->dispatch(undef, undef, sub { ok(not defined shift) });
+$d->dispatch($human, undef, sub { ok(not defined shift) });
 
-$d->dispatch(undef, _msg('FOO'), sub { ok(not defined shift); });
+my $msg = _msg('FOO');
+$d->dispatch($human, $msg, sub { ok($msg->any_body); });
 
-$d->dispatch(undef, _msg('PING'), sub { is(shift->body, 'PONG'); });
+$msg = _msg('PING');
+$d->dispatch($human, $msg, sub { is($msg->any_body, 'PONG'); });
 
 $d->add_map('*' => Hamster::Command::Ping->new);
 
-$d->dispatch(undef, _msg('FOO'), sub { is(shift->body, 'PONG'); });
+$msg = _msg('FOO');
+$d->dispatch($human, $msg, sub { is($msg->any_body, 'PONG'); });
 
 sub _msg {
-    AnyEvent::XMPP::IM::Message->new(body => shift);
+    my $mock = MessageMock->new();
+    $mock->set_always(any_body => shift);
 }

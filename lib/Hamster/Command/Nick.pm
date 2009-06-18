@@ -12,18 +12,14 @@ sub run {
     my $old_nick = $self->human->nick;
 
     if (!$nick) {
-        my $reply = $self->msg->make_reply;
-
         if ($old_nick) {
-            $reply->add_body("Your current nick: $old_nick");
+            return $self->send("Your current nick: $old_nick",
+                sub { $cb->() });
         }
         else {
-            $reply->add_body("You didn't choose any nickname yet");
+            return $self->send("You didn't choose any nickname yet",
+                sub { $cb->() });
         }
-
-        $reply->send;
-
-        return $cb->();
     }
     else {
         my $dbh = $self->hamster->dbh;
@@ -31,42 +27,22 @@ sub run {
         if ($old_nick && $old_nick eq $nick) {
             my $reply = $self->msg->make_reply;
 
-            $reply->add_body('It is the same nickname');
-
-            $reply->send;
-
-            $cb->();
+            return $self->send("It is the same nickname", sub { $cb->() });
         }
         else {
-            $dbh->exec(
-                qq/SELECT nick FROM `human` WHERE `nick`=?/ => ($nick) => sub {
-                    my ($dbh, $rows, $rv) = @_;
+            $self->human->update_nick(
+                $dbh,
+                {nick => $nick},
+                sub {
+                    my ($dbh, $ok) = @_;
 
-                    # If we found topic
-                    if (@$rows) {
-                        my $reply = $self->msg->make_reply;
-
-                        $reply->add_body('This nickname is already taken');
-
-                        $reply->send;
-
-                        $cb->();
+                    if ($ok) {
+                        return $self->send("Your nickname was changed",
+                            sub { $cb->() });
                     }
                     else {
-                        $dbh->exec(
-                            qq/UPDATE human SET nick=? WHERE id=?/ =>
-                              ($nick, $self->human->id) => sub {
-                                my ($dbh, $rows, $rv) = @_;
-
-                                my $reply = $self->msg->make_reply;
-
-                                $reply->add_body('Your nickname was changed');
-
-                                $reply->send;
-
-                                $cb->();
-                            }
-                        );
+                        return $self->send("This nickname is already taken",
+                            sub { $cb->() });
                     }
                 }
             );

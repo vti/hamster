@@ -8,8 +8,6 @@ sub run {
     my $self = shift;
     my ($cb) = @_;
 
-    my $reply = $self->msg->make_reply;
-
     my $help =<<EOF;
 HELP -- this help
 
@@ -35,11 +33,7 @@ PING -- ping bot
 
 EOF
 
-    $reply->add_body($help);
-
-    $reply->send;
-
-    return $cb->();
+    return $self->send($help, sub { $cb->() });
 }
 
 1;

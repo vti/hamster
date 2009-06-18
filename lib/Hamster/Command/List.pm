@@ -4,50 +4,37 @@ use Mouse;
 
 extends 'Hamster::Command::Base';
 
+use Hamster::Topic;
+
 sub run {
     my $self = shift;
     my ($cb) = @_;
 
     my $dbh = $self->hamster->dbh;
 
-    $dbh->exec(
-        qq/SELECT topic.id,topic.body,topic.replies,jid.jid,human.nick FROM `topic`
-            JOIN jid ON jid.id=topic.jid_id
-            JOIN human ON human.id=jid.human_id
-            ORDER BY topic.addtime DESC LIMIT 10/ =>
-          sub {
-            my ($dbh, $rows, $rv) = @_;
+    Hamster::Topic->find_all(
+        $dbh,
+        {},
+        sub {
+            my ($dbh, $topics) = @_;
 
-            my $reply = $self->msg->make_reply;
-
-            @$rows = reverse @$rows;
-
-            if (@$rows) {
+            if (@$topics) {
                 my $body = '';
 
-                foreach my $topic (@$rows) {
-                    my $replies = $topic->[2];
-                    my $nick = $topic->[3] || $topic->[2];
-
+                foreach my $topic (@$topics) {
                     $body
                       .= $self->hamster->localizator->loc($self->human->lang,
                         '#[_1] by [_2] (Replies: [_3])',
-                        $topic->[0], $nick, $replies) . "\n";
-                    $body .= $topic->[1] . "\n";
-
+                        $topic->id, $topic->author, $topic->replies)
+                      . "\n";
+                    $body .= $topic->body . "\n";
                 }
 
-                warn $body;
-
-                $reply->add_body($body);
+                return $self->send($body, sub { $cb->() });
             }
             else {
-                $reply->add_body("No topics yet");
+                return $self->send('No topics yest', sub { $cb->() });
             }
-
-            $reply->send;
-
-            return $cb->();
         }
     );
 }

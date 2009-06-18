@@ -136,89 +136,24 @@ sub BUILD {
 
             my ($jid, $resource) = split('/', $msg->from);
 
-            $self->dbh->exec(
-                qq/SELECT human.id,human.nick,human.lang
-                    FROM `human`
-                    JOIN `jid` ON `human`.`id` = `human_id` WHERE `jid`=?/,
-                $jid,
-                sub {
-                    my ($dbh, $rows, $rv) = @_;
+            Hamster::Human->find(
+                $self->dbh,
+                {jid => $jid, resource => $resource} => sub {
+                    my ($dbh, $human) = @_;
 
-                    if (@$rows) {
-                        my $human_row = $rows->[0];
+                    if ($human) {
+                        $self->dispatch($human, $msg, sub { });
+                    }
+                    else {
+                        Hamster::Human->create(
+                            $dbh,
+                            {jid => $jid, resource => $resource} => sub {
+                                my ($dbh, $human) = @_;
 
-                        warn 'FOUND USER: ' . $human_row->[0];
-
-                        my $human = Hamster::Human->new(
-                            id       => $human_row->[0],
-                            lang     => $human_row->[2],
-                            resource => $resource
-                        );
-
-                        $human->nick($human_row->[1]) if $human_row->[1];
-
-                        return $self->dbh->exec(
-                            qq/SELECT * FROM `jid` WHERE `human_id`=?/,
-                            $human->id,
-                            sub {
-                                my ($dbh, $rows, $rv) = @_;
-
-                                foreach my $jid (@$rows) {
-                                    $human->add_jid($jid->[0], $jid->[2]);
-                                }
-
-                                use Data::Dumper;
-                                warn Dumper $human;
-
-                                return $self->dispatch($human, $msg, sub { });
+                                $self->dispatch($human, $msg, sub { });
                             }
                         );
                     }
-
-                    warn 'USER NOT FOUND';
-
-                    $self->dbh->exec(
-                        'INSERT INTO `human` (`addtime`) VALUES (?)',
-                        time,
-                        sub {
-                            my ($rs, $rows, $rv) = @_;
-
-                            $dbh->func(
-                                q/undef, undef, 'human', 'id'/,
-                                'last_insert_id',
-                                sub {
-                                    my ($dbh, $result, $handle_error) = @_;
-
-                                    $self->dbh->exec(
-                                        'INSERT INTO `jid` (`human_id`,`jid`) VALUES (?, ?)',
-                                        ($result, $jid) => sub {
-
-                                            $dbh->func(
-                                                q/undef, undef, 'jid', 'id'/,
-                                                'last_insert_id',
-                                                sub {
-                                                    my ($dbh, $result, $handle_error) = @_;
-
-                                                    my $human = Hamster::Human->new(
-                                                        id       => $result,
-                                                        resource => $resource
-                                                    );
-
-                                                    $human->add_jid($result, $jid);
-
-                                                    use Data::Dumper;
-                                                    warn Dumper $human;
-
-                                                    return $self->dispatch($human,
-                                                        $msg, sub { });
-                                                }
-                                            );
-                                        }
-                                    );
-                                }
-                            );
-                        }
-                    );
                 }
             );
         },
