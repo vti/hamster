@@ -25,6 +25,7 @@ use Hamster::Command::CreateReply;
 use Hamster::Command::CreateTopic;
 use Hamster::Command::ViewTopic;
 use Hamster::Command::Subscribe;
+use Hamster::Command::Unsubscribe;
 use Hamster::Command::Stat;
 use Hamster::Command::Lang;
 
@@ -72,17 +73,19 @@ has dispatcher => (
     default => sub {
         Hamster::Dispatcher->new(
             map => [
-                qr/^HELP$/ => Hamster::Command::Help->new,
-                qr/^PING$/ => Hamster::Command::Ping->new,
-                qr/^(#)$/ => Hamster::Command::List->new,
-                qr/^STAT$/ => Hamster::Command::Stat->new,
+                qr/^HELP$/                   => Hamster::Command::Help->new,
+                qr/^PING$/                   => Hamster::Command::Ping->new,
+                qr/^(#)$/                    => Hamster::Command::List->new,
+                qr/^STAT$/                   => Hamster::Command::Stat->new,
                 qr/^LANG(?: ([a-z][a-z]))?$/ => Hamster::Command::Lang->new,
                 qr/^NICK(?: ([a-zA-Z][a-zA-Z0-9-]{1,15}))?$/ =>
                   Hamster::Command::Nick->new,
                 qr/^#(\d+)(\+)?$/ => Hamster::Command::ViewTopic->new,
                 qr/^#(\d+)(?:\/(\d+))?\s+(.+)/ =>
                   Hamster::Command::CreateReply->new,
-                '*' => Hamster::Command::CreateTopic->new
+                qr/^S(?: (#)(\d+))?$/ => Hamster::Command::Subscribe->new,
+                qr/^U (#)(\d+)$/      => Hamster::Command::Unsubscribe->new,
+                '*'                   => Hamster::Command::CreateTopic->new
             ]
         );
     }

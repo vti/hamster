@@ -39,7 +39,7 @@ $topic->[0]
                     return $dbh->exec(
                         qq/SELECT reply.topic_id, reply.seq, reply.body,
                                 jid.jid, human.nick,
-                                parent_jid.jid,parent_human.nick
+                                parent_jid.jid, parent_human.nick, parent.body
                             FROM `reply`
                             JOIN jid ON jid.id=reply.jid_id
                             JOIN human ON human.id=jid.human_id
@@ -54,15 +54,22 @@ $topic->[0]
                           sub {
                             my ($dbh, $rows, $rv) = @_;
 
-                            use Data::Dumper;
-                            warn Dumper $rows;
-
                             foreach my $row (@$rows) {
                                 my $nick = $row->[4] || $row->[3];
                                 my $parent_nick = $row->[6] || $row->[5];
 
                                 my $reply_to = '';
-                                $reply_to = "\@$parent_nick, " if $parent_nick;
+                                if ($parent_nick) {
+                                    $reply_to = "> ";
+                                    if (length($row->[7]) > 77) {
+                                        $reply_to .= substr($row->[7], 0, 77);
+                                        $reply_to .= '...';
+                                    }
+                                    else {
+                                        $reply_to .= $row->[7];
+                                    }
+                                    $reply_to .= "\n\@$parent_nick, ";
+                                }
 
                                 $body .= <<"";
 #$row->[0]/$row->[1] by $nick
@@ -70,7 +77,6 @@ $reply_to$row->[2]
 
                             }
 
-                            warn $body;
                             $reply->add_body($body);
 
                             $reply->send;
