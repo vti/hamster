@@ -73,7 +73,7 @@ has dispatcher => (
                 qr/^PING$/ => Hamster::Command::Ping->new,
                 qr/^STAT$/ => Hamster::Command::Stat->new,
                 qr/^LANG$/ => Hamster::Command::Lang->new,
-                qr/^NICK ([a-zA-Z][a-zA-Z0-9-]{1,15})$/ =>
+                qr/^NICK(?: ([a-zA-Z][a-zA-Z0-9-]{1,15}))?$/ =>
                   Hamster::Command::Nick->new,
                 qr/^#(\d+)(\+)?$/ => Hamster::Command::ViewTopic->new,
                 qr/^#(\d+)(?:\/(\d+))?\s+(.+)/ =>
@@ -130,18 +130,24 @@ sub BUILD {
             my ($jid, $resource) = split('/', $msg->from);
 
             $self->dbh->exec(
-                qq/SELECT * FROM `human` JOIN `jid` ON `human`.`id` = `human_id` WHERE `jid`=?/,
+                qq/SELECT human.id,human.nick
+                    FROM `human`
+                    JOIN `jid` ON `human`.`id` = `human_id` WHERE `jid`=?/,
                 $jid,
                 sub {
                     my ($dbh, $rows, $rv) = @_;
 
                     if (@$rows) {
-                        warn 'FOUND USER: ' . $rows->[0]->[0];
+                        my $human_row = $rows->[0];
+
+                        warn 'FOUND USER: ' . $human_row->[0];
 
                         my $human = Hamster::Human->new(
-                            id       => $rows->[0]->[0],
+                            id       => $human_row->[0],
                             resource => $resource
                         );
+
+                        $human->nick($human_row->[1]) if $human_row->[1];
 
                         return $self->dbh->exec(
                             qq/SELECT * FROM `jid` WHERE `human_id`=?/,
