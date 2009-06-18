@@ -17,6 +17,7 @@ use Hamster::Localizator;
 use Hamster::Human;
 use Hamster::Dispatcher;
 
+use Hamster::Command::Help;
 use Hamster::Command::Ping;
 use Hamster::Command::Nick;
 use Hamster::Command::CreateReply;
@@ -70,6 +71,7 @@ has dispatcher => (
     default => sub {
         Hamster::Dispatcher->new(
             map => [
+                qr/^HELP$/ => Hamster::Command::Help->new,
                 qr/^PING$/ => Hamster::Command::Ping->new,
                 qr/^STAT$/ => Hamster::Command::Stat->new,
                 qr/^LANG$/ => Hamster::Command::Lang->new,
