@@ -37,11 +37,20 @@ $topic->[0]
 
                 if ($show_replies && $replies) {
                     return $dbh->exec(
-                        qq/SELECT reply.topic_id,reply.seq,reply.body,jid.jid,human.nick
+                        qq/SELECT reply.topic_id, reply.seq, reply.body,
+                                jid.jid, human.nick,
+                                parent_jid.jid,parent_human.nick
                             FROM `reply`
                             JOIN jid ON jid.id=reply.jid_id
                             JOIN human ON human.id=jid.human_id
-                            WHERE topic_id=? ORDER BY reply.seq ASC/ => ($id) =>
+                            LEFT JOIN reply AS parent
+                                ON parent.topic_id=reply.topic_id
+                                    AND parent.seq=reply.parent_seq
+                            LEFT JOIN jid AS parent_jid
+                                ON parent_jid.id=parent.jid_id
+                            LEFT JOIN human AS parent_human
+                                ON parent_human.id=parent_jid.human_id
+                            WHERE reply.topic_id=? ORDER BY reply.seq ASC/ => ($id) =>
                           sub {
                             my ($dbh, $rows, $rv) = @_;
 
@@ -50,10 +59,14 @@ $topic->[0]
 
                             foreach my $row (@$rows) {
                                 my $nick = $row->[4] || $row->[3];
+                                my $parent_nick = $row->[6] || $row->[5];
+
+                                my $reply_to = '';
+                                $reply_to = "\@$parent_nick, " if $parent_nick;
 
                                 $body .= <<"";
 #$row->[0]/$row->[1] by $nick
-$row->[2]
+$reply_to$row->[2]
 
                             }
 

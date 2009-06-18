@@ -73,7 +73,7 @@ has dispatcher => (
                 qr/^STAT$/             => Hamster::Command::Stat->new,
                 qr/^LANG$/             => Hamster::Command::Lang->new,
                 qr/^#\d+\+?$/          => Hamster::Command::ViewTopic->new,
-                qr/^#\d+.+$/             => Hamster::Command::CreateReply->new,
+                qr/^#\d+.+(?:\/\d+)?$/      => Hamster::Command::CreateReply->new,
                 #qr/^S (?:#|\*|\@)\d+$/ => Hamster::Command::Subscribe->new,
                 '*'                    => Hamster::Command::CreateTopic->new
             ]
