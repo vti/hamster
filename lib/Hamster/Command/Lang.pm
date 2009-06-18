@@ -8,13 +8,46 @@ sub run {
     my $self = shift;
     my ($cb) = @_;
 
-    my $reply = $self->msg->make_reply;
+    my $dbh = $self->hamster->dbh;
 
-    $reply->add_body($self->hamster->localizator->language);
+    my ($lang) = @{$self->args};
 
-    $reply->send;
+    if ($lang) {
+        if (grep { $_ eq $lang } @{$self->hamster->localizator->languages}) {
+            $dbh->exec(
+                qq/UPDATE human SET lang=? WHERE `id`=?/ =>
+                  ($lang, $self->human->id) => sub {
+                    my ($dbh, $rows, $rv) = @_;
 
-    return $cb->();
+                    my $reply = $self->msg->make_reply;
+
+                    $reply->add_body('Your current language is ' . $lang);
+
+                    $reply->send;
+
+                    return $cb->();
+                }
+            );
+        }
+        else {
+            my $reply = $self->msg->make_reply;
+
+            $reply->add_body('Unknown language');
+
+            $reply->send;
+
+            return $cb->();
+        }
+    }
+    else {
+        my $reply = $self->msg->make_reply;
+
+        $reply->add_body($self->human->lang);
+
+        $reply->send;
+
+        return $cb->();
+    }
 }
 
 1;

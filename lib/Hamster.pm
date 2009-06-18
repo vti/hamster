@@ -76,7 +76,7 @@ has dispatcher => (
                 qr/^PING$/ => Hamster::Command::Ping->new,
                 qr/^(#)$/ => Hamster::Command::List->new,
                 qr/^STAT$/ => Hamster::Command::Stat->new,
-                qr/^LANG$/ => Hamster::Command::Lang->new,
+                qr/^LANG(?: ([a-z][a-z]))?$/ => Hamster::Command::Lang->new,
                 qr/^NICK(?: ([a-zA-Z][a-zA-Z0-9-]{1,15}))?$/ =>
                   Hamster::Command::Nick->new,
                 qr/^#(\d+)(\+)?$/ => Hamster::Command::ViewTopic->new,
@@ -134,7 +134,7 @@ sub BUILD {
             my ($jid, $resource) = split('/', $msg->from);
 
             $self->dbh->exec(
-                qq/SELECT human.id,human.nick
+                qq/SELECT human.id,human.nick,human.lang
                     FROM `human`
                     JOIN `jid` ON `human`.`id` = `human_id` WHERE `jid`=?/,
                 $jid,
@@ -148,6 +148,7 @@ sub BUILD {
 
                         my $human = Hamster::Human->new(
                             id       => $human_row->[0],
+                            lang     => $human_row->[2],
                             resource => $resource
                         );
 

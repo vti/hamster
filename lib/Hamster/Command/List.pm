@@ -20,6 +20,8 @@ sub run {
 
             my $reply = $self->msg->make_reply;
 
+            @$rows = reverse @$rows;
+
             if (@$rows) {
                 my $body = '';
 
@@ -27,9 +29,11 @@ sub run {
                     my $replies = $topic->[2];
                     my $nick = $topic->[3] || $topic->[2];
 
-                    $body .= <<"";
-#$topic->[0] by $nick (Replies: $replies)
-$topic->[1]
+                    $body
+                      .= $self->hamster->localizator->loc($self->human->lang,
+                        '#[_1] by [_2] (Replies: [_3])',
+                        $topic->[0], $nick, $replies) . "\n";
+                    $body .= $topic->[1] . "\n";
 
                 }
 

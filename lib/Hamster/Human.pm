@@ -25,6 +25,12 @@ has resource => (
     is  => 'rw'
 );
 
+has lang => (
+    isa     => 'Str',
+    is      => 'rw',
+    default => 'en'
+);
+
 sub jid {
     my $self = shift;
 

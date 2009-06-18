@@ -3,9 +3,7 @@ package Hamster::Localizator;
 use Mouse;
 use Hamster::I18N;
 
-has _language => (is => 'rw');
-
-has language_tag => (is => 'rw');
+has language => (is => 'rw');
 
 has languages => (is => 'rw', isa => 'ArrayRef', default => sub { [] });
 
@@ -23,31 +21,28 @@ sub BUILD {
 
     $self->_handle($self->i18n->get_handle($self->language));
 
-    $self->languages();
-}
+    my $path = $INC{join('/', split(/::/, 'Hamster::I18N')) . '.pm'};
+    $path =~ s/\.pm$//;
 
-sub language {
-    my $self = shift;
+    opendir DIR, $path or die "$path: $!";
 
-    if (@_) {
-        my $handle = $self->_handle($self->i18n->get_handle(@_));
+    my @languages =
+      map { s/\.pm$//; $_ } grep {m/^[a-z]{2}\.pm$/} readdir(DIR);
 
-        my $lang = ref $handle;
-        $lang =~ s/^.*::// if $lang;
+    closedir DIR;
 
-        $self->_language($lang);
-        $self->language_tag($handle->language_tag);
-
-        return $self;
-    }
-
-    return $self->_language;
+    $self->languages([@languages]);
 }
 
 sub loc {
     my $self = shift;
+    my $lang = shift;
 
     my $handle = $self->_handle;
+
+    if ($self->language ne $lang) {
+        $handle = $self->_handle($self->i18n->get_handle($lang));
+    }
 
     return $handle->maketext(@_) if $handle;
 
