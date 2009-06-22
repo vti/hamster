@@ -17,10 +17,18 @@ sub dbh {
     return AnyEvent::DBI->new("dbi:SQLite:dbname=$db", "", "");
 }
 
+sub dbh_simple {
+    _create_database();
+
+    my $db = _database();
+
+    return DBI->connect("dbi:SQLite:dbname=$db", "", "");
+}
+
 sub _create_database {
     my $db = _database();
 
-    #unless (-f $db) {
+    unless (-f $db) {
         my $dbh = DBI->connect("dbi:SQLite:dbname=$db");
 
         my $dir = "$FindBin::Bin/../schema/";
@@ -44,7 +52,7 @@ sub _create_database {
 
             close FILE;
         }
-    #}
+    }
 }
 
 sub cleanup {

@@ -1,7 +1,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 10;
+use Test::More tests => 11;
 
 use lib 't/lib';
 
@@ -9,11 +9,14 @@ use TestDB;
 use AnyEvent;
 
 use_ok('Hamster::Human');
+use_ok('Hamster::JID');
 
 my $human = Hamster::Human->new;
 ok($human);
 
-$human->add_jid(1, 'foo@bar.com');
+my $jid = Hamster::JID->new(id => 1, jid => 'foo@bar.com');
+
+$human->add_jid($jid);
 
 is(@{$human->jids}, 1);
 
@@ -87,5 +90,3 @@ Hamster::Human->find(
 );
 
 $cv->wait;
-
-#TestDB->cleanup;

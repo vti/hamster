@@ -2,7 +2,7 @@ package Hamster::Human;
 
 use Mouse;
 
-use Hamster::Human::JID;
+use Hamster::JID;
 
 has id => (
     isa => 'Int',
@@ -10,7 +10,6 @@ has id => (
 );
 
 has nick => (
-    isa => 'Str',
     is  => 'rw'
 );
 
@@ -60,15 +59,13 @@ sub find {
 
                 $human->nick($row->[1]) if $row->[1];
 
-                $dbh->exec(
-                    qq/SELECT * FROM `jid` WHERE `human_id`=?/,
-                    $human->id,
+                Hamster::JID->find_all(
+                    $dbh,
+                    {human_id => $human->id},
                     sub {
-                        my ($dbh, $rows, $rv) = @_;
+                        my ($dbh, $jids) = @_;
 
-                        foreach my $jid (@$rows) {
-                            $human->add_jid($jid->[0], $jid->[2]);
-                        }
+                        $human->add_jid(@$jids);
 
                         return $cb->($dbh, $human);
                     }
@@ -91,28 +88,26 @@ sub create {
 
             $dbh->func(
                 q/undef, undef, 'human', 'id'/ => last_insert_id => sub {
-                    my ($dbh, $result, $handle_error) = @_;
+                    my ($dbh, $id, $handle_error) = @_;
 
-                    $dbh->exec(
-                        'INSERT INTO `jid` (`human_id`,`jid`) VALUES (?, ?)' =>
-                        ($result, $args->{jid}) => sub {
-                            $dbh->func(
-                                q/undef, undef, 'jid', 'id'/ =>
-                                  last_insert_id => sub {
-                                    my ($dbh, $result, $handle_error) = @_;
+                    my $human = Hamster::Human->new(
+                        id       => $id,
+                        resource => $args->{resource}
+                    );
 
-                                    my $human = Hamster::Human->new(
-                                        id       => $result,
-                                        resource => $args->{resource}
-                                    );
+                    $human->nick($args->{nick}) if $args->{nick};
 
-                                    $human->nick($args->{nick}) if $args->{nick};
+                    Hamster::JID->create(
+                        $dbh,
+                        {   human_id => $id,
+                            jid      => $args->{jid}
+                        },
+                        sub {
+                            my ($dbh, $jid) = @_;
 
-                                    $human->add_jid($result, $args->{jid});
+                            $human->add_jid($jid);
 
-                                    $cb->($dbh, $human);
-                                }
-                            );
+                            $cb->($dbh, $human);
                         }
                     );
                 }
@@ -180,10 +175,7 @@ sub count_all {
 sub add_jid {
     my $self = shift;
 
-    if (@_) {
-        push @{$self->jids},
-          Hamster::Human::JID->new(id => $_[0], jid => $_[1]);
-    }
+    push @{$self->jids}, $_ for @_;
 }
 
 1;

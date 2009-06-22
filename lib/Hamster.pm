@@ -158,6 +158,8 @@ sub BUILD {
                             {jid => $jid, resource => $resource} => sub {
                                 my ($dbh, $human) = @_;
 
+                                $human->jid($jid);
+
                                 $self->dispatch($human, $msg, sub { });
                             }
                         );

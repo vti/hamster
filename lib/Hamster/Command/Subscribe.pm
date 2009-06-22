@@ -4,6 +4,9 @@ use Mouse;
 
 extends 'Hamster::Command::Base';
 
+use Hamster::Topic;
+use Hamster::Subscription;
+
 sub run {
     my $self = shift;
     my ($cb) = @_;
@@ -11,46 +14,48 @@ sub run {
     my ($type, $id) = @{$self->args};
 
     if (!$type) {
-        my $reply = $self->msg->make_reply;
+        Hamster::Subscription->find_all(
+            $self->hamster->dbh,
+            {   master_type => 't',
+                human_id    => $self->human->id
+            },
+            sub {
+                my ($dbh, $subscriptions) = @_;
 
-        $reply->add_body("Your subscriptions:");
+                $subscriptions ||= [];
 
-        $reply->send;
-
-        return $cb->();
+                return $self->send(
+                    $self->render(subscriptions => $subscriptions),
+                    sub { $cb->() });
+            }
+        );
     }
     elsif ($type eq '#') {
         my $dbh = $self->hamster->dbh;
 
-        $dbh->exec(
-            qq/SELECT id FROM `topic` WHERE `id`=?/ => ($id) => sub {
-                my ($dbh, $rows, $rv) = @_;
+        Hamster::Topic->find(
+            $dbh,
+            {id => $id},
+            sub {
+                my ($dbh, $topic) = @_;
 
-                if (@$rows) {
-                    $dbh->exec(
-                        qq/INSERT INTO `subscription` (master_type, master_id, human_id)
-                            VALUES (?, ?, ?)/ => ('t', $id, $self->human->id) =>
-                          sub {
-                            my ($dbh, $rows, $rv) = @_;
+                if ($topic) {
+                    Hamster::Subscription->create_unless_exists(
+                        $dbh,
+                        {   master_type => 't',
+                            master_id   => $id,
+                            human_id    => $self->human->id
+                        },
+                        sub {
+                            my ($dbh, $subscription) = @_;
 
-                            my $reply = $self->msg->make_reply;
-
-                            $reply->add_body("You were subscribed");
-
-                            $reply->send;
-
-                            return $cb->();
+                            $self->send('You were subscribed',
+                                sub { $cb->() });
                         }
                     );
                 }
                 else {
-                    my $reply = $self->msg->make_reply;
-
-                    $reply->add_body("Topic not found");
-
-                    $reply->send;
-
-                    return $cb->();
+                    return $self->send('Topic not found', sub { $cb->() });
                 }
             }
         );

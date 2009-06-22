@@ -28,6 +28,11 @@ has author => (
     is  => 'rw'
 );
 
+has human_id => (
+    isa => 'Int',
+    is  => 'rw'
+);
+
 use Async::Hooks;
 
 sub create {

@@ -6,6 +6,9 @@ extends 'Hamster::Command::Base';
 
 use Hamster::Topic;
 use Hamster::Reply;
+use Hamster::Subscription;
+
+use Hamster::Service::Notify;
 
 sub run {
     my $self = shift;
@@ -28,7 +31,7 @@ sub run {
                     $dbh,
                     {   topic      => $topic,
                         parent_seq => $parent_seq,
-                        human_id   => $self->human->id,
+                        human      => $self->human,
                         body       => $body,
                         jid        => $jid,
                         resource   => $resource
@@ -37,8 +40,23 @@ sub run {
                         my ($dbh, $reply) = @_;
 
                         if ($reply) {
-                            return $self->send('Reply created',
-                                sub { $cb->() });
+                            Hamster::Subscription->create_unless_exists(
+                                $dbh,
+                                {   master_type => 't',
+                                    master_id   => $topic->id,
+                                    human_id    => $self->human->id
+                                },
+                                sub {
+                                    $self->send(
+                                        'Reply created',
+                                        sub {
+                                            _notify_subscribers($self, $dbh,
+                                                $topic, $reply,
+                                                sub { $cb->() });
+                                        }
+                                    );
+                                }
+                            );
                         }
                         else {
                             return $self->send('Reply not found',
@@ -49,6 +67,41 @@ sub run {
             }
             else {
                 return $self->send('Topic not found', sub { $cb->() });
+            }
+        }
+    );
+}
+
+sub _notify_subscribers {
+    my ($self, $dbh, $topic, $reply, $cb) = @_;
+
+    Hamster::Subscription->find_subscribed_humans(
+        $dbh,
+        {   master_type     => 't',
+            master_id       => $topic->id,
+            except_human_id => $reply->human_id
+        },
+        sub {
+            my ($dbh, $humans) = @_;
+
+            use Data::Dumper;
+            warn Dumper $humans;
+
+            if (@$humans) {
+                my $service =
+                  Hamster::Service::Notify->new(hamster => $self->hamster);
+
+                $service->run(
+                    sub {
+                        my $human = shift;
+                        $self->hamster->view->reply($human->lang, $reply);
+                    },
+                    $humans,
+                    sub { $cb->() }
+                );
+            }
+            else {
+                return $cb->();
             }
         }
     );

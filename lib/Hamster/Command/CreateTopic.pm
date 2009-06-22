@@ -5,6 +5,7 @@ use Mouse;
 extends 'Hamster::Command::Base';
 
 use Hamster::Topic;
+use Hamster::Subscription;
 
 sub run {
     my $self = shift;
@@ -27,7 +28,16 @@ sub run {
         sub {
             my ($dbh, $topic) = @_;
 
-            $self->send('Topic was created', sub { $cb->() });
+            Hamster::Subscription->create(
+                $dbh,
+                {   master_type => 't',
+                    master_id   => $topic->id,
+                    human_id    => $self->human->id
+                },
+                sub {
+                    $self->send('Topic was created', sub { $cb->() });
+                }
+            );
         }
     );
 }

@@ -52,4 +52,32 @@ sub stat {
     return join("\n", @out);
 }
 
+sub subscription {
+    my $self = shift;
+    my ($lang, $subscription) = @_;
+
+    return '';
+    #return $self->hamster->loc($lang, '', $
+}
+
+sub subscriptions {
+    my $self = shift;
+    my ($lang, $subscriptions) = @_;
+
+    if (@$subscriptions) {
+        my @out = ();
+
+        push @out, 'Your subscriptions:';
+
+        foreach my $subscription (@$subscriptions) {
+            push @out, $self->subscription($lang, $subscription);
+        }
+
+        return join("\n", @out);
+    }
+    else {
+        return 'You have no subscriptions yet';
+    }
+}
+
 1;

@@ -22,6 +22,11 @@ has author => (
     is  => 'rw'
 );
 
+has human_id => (
+    isa => 'Int',
+    is  => 'rw'
+);
+
 has parent_body => (
     isa => 'Str',
     is  => 'rw'
@@ -43,6 +48,7 @@ sub _create {
     my ($dbh, $args, $cb) = @_;
 
     my $topic = $args->{topic};
+    my $human = $args->{human};
 
     Hamster::Reply->find_current_seq(
         $dbh,
@@ -58,7 +64,7 @@ sub _create {
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)/
                   => (
                     $topic->id, $seq, $args->{parent_seq}, time,
-                    $args->{human_id},
+                    $human->id,
                     $args->{body}, $args->{jid}, $args->{resource}
                   ) => sub {
                     my ($dbh, $rows, $rv) = @_;
@@ -70,8 +76,10 @@ sub _create {
                             my ($dbh, $result, $handle_error) = @_;
 
                             my $reply = Hamster::Reply->new(
-                                seq  => $seq,
-                                body => $args->{body}
+                                seq      => $seq,
+                                body     => $args->{body},
+                                human_id => $human->id,
+                                author => $args->{human}->nick || $args->{jid}
                             );
 
                             $topic->inc_replies(
@@ -109,6 +117,9 @@ sub create {
                         $args,
                         sub {
                             my ($dbh, $reply) = @_;
+
+                            $reply->_quote_parent($parent->author,
+                                $parent->body);
 
                             return $cb->($dbh, $reply);
                         }
@@ -157,8 +168,11 @@ sub find {
     my ($dbh, $args, $cb) = @_;
 
     $dbh->exec(
-        qq/SELECT reply.topic_id, reply.seq, reply.human_id, reply.body
-            FROM `reply` WHERE topic_id=? AND seq=?/ =>
+        qq/SELECT reply.topic_id, reply.seq, reply.human_id, reply.body,
+            reply.jid, reply.resource, human.nick
+            FROM `reply`
+            LEFT JOIN human ON human.id=reply.human_id
+            WHERE topic_id=? AND seq=?/ =>
           ($args->{topic_id}, $args->{seq}) => sub {
             my ($dbh, $rows, $rv) = @_;
 
@@ -169,7 +183,8 @@ sub find {
                     topic_id => $row->[0],
                     seq      => $row->[1],
                     human_id => $row->[2],
-                    body     => $row->[3]
+                    body     => $row->[3],
+                    author   => $row->[6] || $row->[4]
                 );
 
                 return $cb->($dbh, $reply);
@@ -211,21 +226,7 @@ sub find_all {
                     body     => $row->[2]
                 );
 
-                if (my $parent_author = $row->[7] || $row->[6]) {
-                    my $parent_body = '';
-
-                    if (length($row->[5]) > $reply->parent_body_max_length) {
-                        $parent_body .= substr($row->[5], 0,
-                            $reply->parent_body_max_length);
-                        $parent_body .= '...';
-                    }
-                    else {
-                        $parent_body .= $row->[5];
-                    }
-
-                    $reply->parent_author($parent_author);
-                    $reply->parent_body($parent_body);
-                }
+                $reply->_quote_parent($row->[7] || $row->[6], $row->[5]);
 
                 push @$replies, $reply;
             }
@@ -233,6 +234,25 @@ sub find_all {
             return $cb->($dbh, $replies);
         }
     );
+}
+
+sub _quote_parent {
+    my $self = shift;
+    my ($parent_author, $parent_body) = @_;
+
+    return unless $parent_author;
+
+    if (length($parent_body) > $self->parent_body_max_length) {
+        $parent_body .= substr($parent_body, 0,
+            $self->parent_body_max_length);
+        $parent_body .= '...';
+    }
+    else {
+        $parent_body .= $parent_body;
+    }
+
+    $self->parent_author($parent_author);
+    $self->parent_body($parent_body);
 }
 
 1;

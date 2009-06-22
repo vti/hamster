@@ -7,6 +7,7 @@ use lib 't/lib';
 
 use TestDB;
 use AnyEvent;
+use Hamster::Human;
 use Hamster::Topic;
 
 use_ok('Hamster::Reply');
@@ -16,6 +17,7 @@ my $cv = AnyEvent->condvar;
 my $dbh = TestDB->dbh;
 
 my $topic = Hamster::Topic->new(id => 1);
+my $human = Hamster::Human->new(id => 1);
 
 Hamster::Reply->find(
     $dbh,
@@ -27,7 +29,7 @@ Hamster::Reply->find(
         Hamster::Reply->create(
             $dbh,
             {   topic    => $topic,
-                human_id => 1,
+                human    => $human,
                 body     => 'body',
                 jid      => 'foo@bar.com',
                 resource => 'foo'
@@ -49,7 +51,7 @@ Hamster::Reply->find(
                         Hamster::Reply->create(
                             $dbh,
                             {   topic    => $topic,
-                                human_id => 1,
+                                human    => $human,
                                 body     => 'body',
                                 jid      => 'foo@bar.com',
                                 resource => 'foo'
@@ -64,7 +66,7 @@ Hamster::Reply->find(
                                     $dbh,
                                     {   topic      => $topic,
                                         parent_seq => $reply->seq,
-                                        human_id   => 1,
+                                        human      => $human,
                                         body       => 'body',
                                         jid        => 'foo@bar.com',
                                         resource   => 'foo'
